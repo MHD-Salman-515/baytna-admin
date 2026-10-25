@@ -163,6 +163,7 @@ export const en: Messages = {
   "worker.docApproved": "Document approved.",
   "worker.docRejected": "Document rejected.",
   "worker.approveConfirm": "Approve this worker? She will be able to receive bookings.",
+  "worker.approveDocsPending": "Note: {count} of her documents are not approved yet.",
   "worker.reasonAr": "Reason (Arabic)",
   "worker.reasonEn": "Reason (English, optional)",
   "worker.reasonRequired": "A reason is required.",
@@ -187,5 +188,6 @@ export const en: Messages = {
   "viewer.loading": "Opening document…",
   "viewer.failed": "Couldn't display the document.",
   "viewer.notice": "Confidential document. Every view is logged. Don't photograph or share the screen.",
+  "viewer.insecure": "The console refused to open this document: the backend issued an unencrypted (http) storage link. This must be fixed on the backend.",
   "viewer.unsupported": "This file type can't be displayed.",
 };

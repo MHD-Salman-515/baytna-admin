@@ -141,6 +141,12 @@ export type WorkerDocument = {
   createdAt: string;
 };
 
+/**
+ * GET /admin/workers/:id/documents/:docId/url — read ONLY by the server-side
+ * route app/api/documents/view. Each call writes an audit entry.
+ */
+export type DocumentUrlResponse = { url: string; expiresInSeconds: number };
+
 /** GET /admin/workers/:id */
 export type WorkerDetail = { profile: WorkerProfile; documents: WorkerDocument[] };
 

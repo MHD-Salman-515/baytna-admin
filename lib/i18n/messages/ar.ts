@@ -164,6 +164,7 @@ export const ar = {
   "worker.docApproved": "تم قبول الوثيقة.",
   "worker.docRejected": "تم رفض الوثيقة.",
   "worker.approveConfirm": "تأكيد قبول هذه العاملة؟ ستتمكن من استقبال الحجوزات.",
+  "worker.approveDocsPending": "تنبيه: {count} من وثائقها لم تُقبل بعد.",
   "worker.reasonAr": "السبب (بالعربية)",
   "worker.reasonEn": "السبب (بالإنجليزية، اختياري)",
   "worker.reasonRequired": "السبب مطلوب.",
@@ -188,6 +189,7 @@ export const ar = {
   "viewer.loading": "جارٍ فتح الوثيقة…",
   "viewer.failed": "تعذر عرض الوثيقة.",
   "viewer.notice": "وثيقة سرية. يُسجَّل كل عرض. لا تصوّر الشاشة ولا تشاركها.",
+  "viewer.insecure": "رفضت اللوحة فتح الوثيقة: الخادم أصدر رابط تخزين غير مشفّر (http). يجب إصلاح ذلك في الخادم.",
   "viewer.unsupported": "نوع الملف غير مدعوم للعرض.",
 } as const;
 
