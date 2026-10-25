@@ -13,6 +13,10 @@ export default function config(phase: string): NextConfig {
   return {
     experimental: {
       agentFeedback: true,
+      // Admin pages render only after the client-side session is established
+      // (AdminGate), so they have no static shell by design. Validate instant
+      // navigation only where a segment opts in explicitly.
+      instantInsights: { validationLevel: "manual-warning" },
     },
     cacheComponents: true,
     partialPrefetching: true,

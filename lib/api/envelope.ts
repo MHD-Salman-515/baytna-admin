@@ -9,7 +9,7 @@ type ErrorBody = {
   error?: string;
 };
 
-type Envelope<T> = { success: true; data: T } | { success: false; error: ErrorBody };
+type Envelope<T> = { success: true; data: T; meta?: unknown } | { success: false; error: ErrorBody };
 
 function isObject(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null;
@@ -23,7 +23,33 @@ export function normaliseMessages(message: unknown): string[] {
 
 /** Converts a fetch Response into its unwrapped `data`, or throws ApiError. */
 export async function unwrapResponse<T>(res: Response): Promise<T> {
-  if (res.status === 204) return undefined as T;
+  return (await unwrapEnvelope<T>(res)).data;
+}
+
+export type PageMeta = { page: number; limit: number; total: number; totalPages: number };
+export type Page<T> = { items: T[]; meta: PageMeta };
+
+/**
+ * Paginated endpoints put `meta` beside `data`:
+ *   { success, data: [...], meta: { page, limit, total, totalPages } }
+ */
+export async function unwrapPage<T>(res: Response): Promise<Page<T>> {
+  const { data, meta } = await unwrapEnvelope<T[]>(res);
+  const items = Array.isArray(data) ? data : [];
+  const m = isObject(meta) ? (meta as Partial<PageMeta>) : {};
+  return {
+    items,
+    meta: {
+      page: m.page ?? 1,
+      limit: m.limit ?? items.length,
+      total: m.total ?? items.length,
+      totalPages: Math.max(1, m.totalPages ?? 1),
+    },
+  };
+}
+
+async function unwrapEnvelope<T>(res: Response): Promise<{ data: T; meta?: unknown }> {
+  if (res.status === 204) return { data: undefined as T };
 
   let body: unknown = null;
   const text = await res.text();
@@ -37,7 +63,7 @@ export async function unwrapResponse<T>(res: Response): Promise<T> {
 
   if (isObject(body) && "success" in body) {
     const env = body as Envelope<T>;
-    if (env.success) return env.data;
+    if (env.success) return { data: env.data, meta: env.meta };
     const err = env.error ?? {};
     throw new ApiError({
       kind: "http",
@@ -51,7 +77,7 @@ export async function unwrapResponse<T>(res: Response): Promise<T> {
     throw new ApiError({ kind: "http", status: res.status, code: res.statusText || "HTTP error" });
   }
   // A 2xx without an envelope: hand back whatever it was.
-  return body as T;
+  return { data: body as T };
 }
 
 /** Wraps fetch with a timeout and maps transport failures to ApiError. */

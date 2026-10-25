@@ -1,12 +1,12 @@
-// Browser API client. Feature code calls `api.get/post` and receives the
-// unwrapped `data` typed as T, or an ApiError. It never sees the envelope,
+// Browser API client. Feature code calls `api.get/getPage/post` and receives
+// the unwrapped `data` typed as T, or an ApiError. It never sees the envelope,
 // the bearer header, or the refresh dance.
 
 import { API_BASE_URL, REQUEST_TIMEOUT_MS } from "@/lib/env";
 import { refreshSession } from "@/lib/auth/refresh";
 import { secondsUntilExpiry, sessionStore } from "@/lib/auth/session";
 import { trackRequest } from "./activity";
-import { fetchWithTimeout, unwrapResponse } from "./envelope";
+import { fetchWithTimeout, unwrapPage, unwrapResponse, type Page } from "./envelope";
 import { ApiError } from "./errors";
 
 type Query = Record<string, string | number | boolean | undefined | null>;
@@ -17,15 +17,20 @@ type RequestOptions = {
   signal?: AbortSignal;
   /** Public endpoints (e.g. /countries) skip the bearer token. */
   auth?: boolean;
+  /** Call this app's own route handlers (/api/...) instead of the backend. */
+  local?: boolean;
 };
+
+type Reader<R> = (res: Response) => Promise<R>;
 
 /** Refresh slightly before the 15-minute access token actually expires. */
 const EXPIRY_SKEW_SECONDS = 30;
 
-function buildUrl(path: string, query?: Query): string {
-  const url = new URL(`${API_BASE_URL}${path}`);
-  if (query) {
-    for (const [k, v] of Object.entries(query)) {
+function buildUrl(path: string, opts: RequestOptions): string {
+  const base = opts.local ? window.location.origin : API_BASE_URL;
+  const url = new URL(`${base}${path}`);
+  if (opts.query) {
+    for (const [k, v] of Object.entries(opts.query)) {
       if (v !== undefined && v !== null && v !== "") url.searchParams.set(k, String(v));
     }
   }
@@ -47,28 +52,28 @@ async function send(method: string, path: string, opts: RequestOptions, token?: 
   if (opts.body !== undefined) headers["content-type"] = "application/json";
   if (token) headers.authorization = `Bearer ${token}`;
   return fetchWithTimeout(
-    buildUrl(path, opts.query),
+    buildUrl(path, opts),
     {
       method,
       headers,
       body: opts.body === undefined ? undefined : JSON.stringify(opts.body),
       signal: opts.signal,
       cache: "no-store",
-      credentials: "omit",
+      credentials: opts.local ? "same-origin" : "omit",
       referrerPolicy: "no-referrer",
     },
     REQUEST_TIMEOUT_MS,
   );
 }
 
-async function request<T>(method: string, path: string, opts: RequestOptions = {}): Promise<T> {
+async function request<R>(method: string, path: string, opts: RequestOptions, read: Reader<R>): Promise<R> {
   const done = trackRequest();
   try {
-    if (opts.auth === false) return await unwrapResponse<T>(await send(method, path, opts));
+    if (opts.auth === false) return await read(await send(method, path, opts));
 
     const token = await getAccessToken();
     try {
-      return await unwrapResponse<T>(await send(method, path, opts, token));
+      return await read(await send(method, path, opts, token));
     } catch (e) {
       if (!(e instanceof ApiError && e.isUnauthorized)) throw e;
       // The token was rejected. Refresh once (shared with every other caller
@@ -76,7 +81,7 @@ async function request<T>(method: string, path: string, opts: RequestOptions = {
       const current = sessionStore.accessToken();
       const fresh = current && current !== token ? current : (await refreshSession()).accessToken;
       try {
-        return await unwrapResponse<T>(await send(method, path, opts, fresh));
+        return await read(await send(method, path, opts, fresh));
       } catch (retryError) {
         if (retryError instanceof ApiError && retryError.isUnauthorized) {
           sessionStore.clear("expired");
@@ -90,8 +95,22 @@ async function request<T>(method: string, path: string, opts: RequestOptions = {
   }
 }
 
-export const api = {
-  get: <T>(path: string, opts?: Omit<RequestOptions, "body">) => request<T>("GET", path, opts),
-  post: <T>(path: string, body?: unknown, opts?: Omit<RequestOptions, "body">) =>
-    request<T>("POST", path, { ...opts, body }),
+/** Reads a binary body; error responses still arrive as JSON envelopes. */
+const readBlob: Reader<Blob> = async (res) => {
+  if (!res.ok) return unwrapResponse<never>(res);
+  return res.blob();
 };
+
+export const api = {
+  get: <T>(path: string, opts?: Omit<RequestOptions, "body">) =>
+    request("GET", path, opts ?? {}, unwrapResponse<T>),
+  getPage: <T>(path: string, opts?: Omit<RequestOptions, "body">) =>
+    request("GET", path, opts ?? {}, unwrapPage<T>),
+  post: <T>(path: string, body?: unknown, opts?: Omit<RequestOptions, "body">) =>
+    request("POST", path, { ...opts, body }, unwrapResponse<T>),
+  /** POST to a local route handler that answers with bytes (document viewer). */
+  postForBlob: (path: string, body?: unknown, opts?: Omit<RequestOptions, "body" | "local">) =>
+    request("POST", path, { ...opts, body, local: true }, readBlob),
+};
+
+export type { Page };

@@ -37,8 +37,8 @@ export function AppShell({ children }: { children: ReactNode }) {
   return (
     <div className="flex min-h-screen">
       <aside
-        className={`fixed inset-y-0 start-0 z-30 w-56 shrink-0 border-e border-border bg-surface transition-transform md:static md:translate-x-0 ${
-          menuOpen ? "translate-x-0" : "ltr:-translate-x-full rtl:translate-x-full"
+        className={`fixed inset-y-0 start-0 z-30 w-56 shrink-0 border-e border-border bg-surface transition-transform md:static ${
+          menuOpen ? "" : "max-md:ltr:-translate-x-full max-md:rtl:translate-x-full"
         }`}
       >
         <div className="flex h-12 items-center gap-2 border-b border-border px-4">
